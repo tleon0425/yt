@@ -1,0 +1,105 @@
+import React, { useState } from 'react';
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+
+const API_KEY = process.env.NEXT_PUBLIC_AIzaSyD3PZwHCFrZ79VkBT7GmG7kNTnv3x29low;
+
+export default function ChannelScriptOptimizer() {
+  const [channelId, setChannelId] = useState('');
+  const [videos, setVideos] = useState([]);
+  const [script, setScript] = useState('');
+
+  const fetchVideos = async () => {
+    try {
+      const searchRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&order=date&maxResults=5&key=${API_KEY}`);
+      const searchData = await searchRes.json();
+      setVideos(searchData.items);
+    } catch (error) {
+      console.error("Error fetching videos", error);
+    }
+  };
+
+  const fetchTranscript = async (videoId) => {
+    try {
+      const res = await fetch(`https://youtube-transcript-api.herokuapp.com/api/transcript/${videoId}`);
+      const data = await res.json();
+      return data.transcript.map(seg => seg.text).join(' ');
+    } catch (error) {
+      console.error("Transcript fetch failed", error);
+      return "Transcript unavailable.";
+    }
+  };
+
+  const analyzeTranscript = (text) => {
+    const sentences = text.split('. ');
+    const hook = sentences[0];
+    const value = sentences.slice(1, 4).join('. ');
+    const narrative = sentences.slice(4, 6).join('. ');
+    const cta = "If you found this useful, consider liking and subscribing for more.";
+
+    // Sentiment/emotion tagging mock logic
+    const sentiments = ["Positive", "Neutral", "Inspirational", "Critical"];
+    const detectedSentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
+
+    return { hook, value, narrative, cta, detectedSentiment };
+  };
+
+  const generateScript = async (video) => {
+    const transcript = await fetchTranscript(video.id.videoId);
+    const { hook, value, narrative, cta, detectedSentiment } = analyzeTranscript(transcript);
+
+    const enhancedScript = `Improved Script for: ${video.snippet.title}
+
+1. Hook: ${hook}
+2. Value Summary: ${value}
+3. Narrative Twist: ${narrative}
+4. CTA: ${cta}
+
+Detected Sentiment: ${detectedSentiment}
+
+Original Insights:
+${transcript.substring(0, 500)}...`;
+
+    setScript(enhancedScript);
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      <h1 className="text-3xl font-bold">YouTube Channel Script Optimizer</h1>
+      <div className="flex gap-4">
+        <Input 
+          placeholder="Enter YouTube Channel ID" 
+          value={channelId} 
+          onChange={(e) => setChannelId(e.target.value)} 
+        />
+        <Button onClick={fetchVideos}>Analyze Channel</Button>
+      </div>
+
+      {videos.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Latest Videos</h2>
+          {videos.map((video, idx) => (
+            <Card key={idx} className="p-4">
+              <CardContent>
+                <div className="flex justify-between items-center">
+                  <p>{video.snippet.title}</p>
+                  <Button onClick={() => generateScript(video)}>Generate Improved Script</Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {script && (
+        <Card>
+          <CardContent className="p-4">
+            <h3 className="text-lg font-bold">Generated Script</h3>
+            <pre className="whitespace-pre-wrap mt-2">{script}</pre>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
